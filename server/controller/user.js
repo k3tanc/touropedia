@@ -1,15 +1,35 @@
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 
+import { error500Response, jwtResponse, resResponse } from '../util/helper.js';
 import UserModel from '../models/user.js';
 
-const secret = "nckowncofihq;NQP";
+
+export const signin = async (req, res) =>{
+    const {email, password} = req.body;
+    try{
+        const oldUser = await UserModel.findOne({email});
+        
+        if(!oldUser) 
+                return  resResponse(res, {message: "Invalid credentials, please check details or register"}, 404);
+
+        const passwordCheck = await bcrypt.compare(password, oldUser.password);
+        if(!passwordCheck) 
+                return resResponse(res, {message: "Invalid credentials"}, 404);
+        
+        const responseData = jwtResponse(oldUser);
+        resResponse(res, responseData, 200);
+
+    }catch(err){
+        error500Response (err, res);
+    }
+}
 
 export const signup = async (req,res) => {
     const {email, password, firstname, lastname } = req.body;
     try{
         const oldUser = await UserModel.findOne({email});
-        if(oldUser) return res.status(400).json({message: "Email address already asossiate with user account, please login or forgot password"});
+        if(oldUser) 
+            return resResponse(res, {message: "Email address already asossiate with user account, please login or forgot password" }, 404)
 
         const hashPassword = await bcrypt.hash(password, 12);
 
@@ -18,19 +38,11 @@ export const signup = async (req,res) => {
             password : hashPassword,
             name : `${firstname} ${lastname}` 
         });
-        console.log(result)
-        const token = jwt.sign({email: result.email, id: result._id}, secret, {expiresIn: "1h"});
 
-        const responseData = {
-            name: result.name,
-            id: result._id,
-            email: result.email,
-            token
-        }
+        const responseData = jwtResponse(result);
 
-        res.status(201).json({responseData});
+        resResponse(res, responseData, 201);
     }catch(err){
-        res.status(500).json({message:"Something went wrong "})
-        console.log(err);
+        error500Response (err, res);
     }
 }
